@@ -7,54 +7,23 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var entries: [Entry]
-
+    
     var body: some View {
-        NavigationView {
-            VStack {
-                List {
-                    ForEach(entries) { entry in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("Check-In: \(entry.checkIn.formatted(date: .abbreviated, time: .shortened))")
-                                if let checkOut = entry.checkOut {
-                                    Text("Check-Out: \(checkOut.formatted(date: .abbreviated, time: .shortened))")
-                                    Text("Total: \(calculateHours(entry: entry)) hours")
-                                } else {
-                                    Text("Currently Checked In")
-                                        .foregroundColor(.red)
-                                }
-                            }
-                        }
-                    }
-                    .onDelete(perform: deleteEntries)
+        TabView {
+            HomeView(entries: entries, checkIn: checkIn, checkOut: checkOut, deleteEntries: deleteEntries, isCurrentlyCheckedIn: isCurrentlyCheckedIn)
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
                 }
-                
-                Spacer()
-                
-                HStack {
-                    Button("Check In") {
-                        checkIn()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    
-                    Button("Check Out") {
-                        checkOut()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!isCurrentlyCheckedIn())
+            
+            ExportView(entries: entries)
+                .tabItem {
+                    Label("Export", systemImage: "square.and.arrow.down.fill")
                 }
-                .padding()
-            }
-            .navigationTitle("Hour Tracker")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-            }
         }
     }
 
@@ -82,18 +51,12 @@ struct ContentView: View {
     }
 
     private func isCurrentlyCheckedIn() -> Bool {
-        guard let lastEntry = entries.last else { return false } // Return false if no entries exist
+        guard let lastEntry = entries.last else { return false }
         return lastEntry.checkOut == nil
-    }
-
-    private func calculateHours(entry: Entry) -> String {
-        guard let checkOut = entry.checkOut else { return "0" }
-        let duration = checkOut.timeIntervalSince(entry.checkIn) / 3600
-        return String(format: "%.2f", duration)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Entry.self, inMemory: true)
+        .modelContainer(for: Entry.self)
 }
