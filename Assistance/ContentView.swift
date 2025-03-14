@@ -10,57 +10,90 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Query private var entries: [Entry]
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        NavigationView {
+            VStack {
+                List {
+                    ForEach(entries) { entry in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text("Check-In: \(entry.checkIn.formatted(date: .abbreviated, time: .shortened))")
+                                if let checkOut = entry.checkOut {
+                                    Text("Check-Out: \(checkOut.formatted(date: .abbreviated, time: .shortened))")
+                                    Text("Total: \(calculateHours(entry: entry)) hours")
+                                } else {
+                                    Text("Currently Checked In")
+                                        .foregroundColor(.red)
+                                }
+                            }
+                        }
                     }
+                    .onDelete(perform: deleteEntries)
                 }
-                .onDelete(perform: deleteItems)
+                
+                Spacer()
+                
+                HStack {
+                    Button("Check In") {
+                        checkIn()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    
+                    Button("Check Out") {
+                        checkOut()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!isCurrentlyCheckedIn())
+                }
+                .padding()
             }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
+            .navigationTitle("Hour Tracker")
             .toolbar {
-#if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     EditButton()
                 }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
             }
-        } detail: {
-            Text("Select an item")
         }
     }
 
-    private func addItem() {
+    private func checkIn() {
         withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+            let newEntry = Entry(checkIn: Date())
+            modelContext.insert(newEntry)
         }
     }
 
-    private func deleteItems(offsets: IndexSet) {
+    private func checkOut() {
+        withAnimation {
+            if let lastUnfinishedEntry = entries.last(where: { $0.checkOut == nil }) {
+                lastUnfinishedEntry.checkOut = Date()
+            }
+        }
+    }
+
+    private func deleteEntries(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
-                modelContext.delete(items[index])
+                modelContext.delete(entries[index])
             }
         }
+    }
+
+    private func isCurrentlyCheckedIn() -> Bool {
+        guard let lastEntry = entries.last else { return false } // Return false if no entries exist
+        return lastEntry.checkOut == nil
+    }
+
+    private func calculateHours(entry: Entry) -> String {
+        guard let checkOut = entry.checkOut else { return "0" }
+        let duration = checkOut.timeIntervalSince(entry.checkIn) / 3600
+        return String(format: "%.2f", duration)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: Entry.self, inMemory: true)
 }
